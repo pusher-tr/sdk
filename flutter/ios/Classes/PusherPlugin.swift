@@ -1,6 +1,5 @@
 import Flutter
 import UIKit
-import PusherCore
 
 /// Flutter MethodChannel bridge into native config + HTTP.
 public class PusherPlugin: NSObject, FlutterPlugin {

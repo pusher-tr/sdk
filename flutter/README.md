@@ -6,8 +6,8 @@ Flutter supplies **project id** and **stats key**. Native Android/iOS own
 HMAC signing and HTTP (`hello` / receipts). `device_helpers` stays a Dart
 dependency for OS/app fields on hello.
 
-Supports **Swift Package Manager** (`ios/pusher/Package.swift`) and CocoaPods
-(`ios/pusher.podspec`).
+Supports CocoaPods (`flutter/ios/pusher.podspec`) and **Swift Package Manager**
+(`ios/Package.swift` for native/NSE `PusherCore`).
 
 Dart entrypoint: `import 'package:pusher/pusher.dart'`.
 
@@ -21,7 +21,8 @@ dependencies:
       path: flutter
 ```
 
-Requires Firebase Messaging in the host (`Firebase.initializeApp` before use).
+No manual `Podfile` entry is needed for the main `Runner` target — `flutter pub get`
+is enough. Requires Firebase Messaging in the host (`Firebase.initializeApp` before use).
 
 Android package: `tr.pusher.sdk`.
 
@@ -62,7 +63,11 @@ unawaited(Pusher.receipt(nid: nid, status: .opened));
 | Android | Plugin `PusherMessagingReceiver` (C2DM) — no Dart handler required |
 | iOS | Host Notification Service Extension calls `PusherCore.handleNotification` |
 
-### iOS App Group + NSE
+### iOS App Group + NSE (optional)
+
+Only needed if you want **background `delivered`** receipts while the iOS app is
+closed. Without an NSE, the main app still reports `opened` and foreground
+`delivered` receipts with zero `Podfile` changes.
 
 The plugin always uses App Group id:
 
@@ -72,18 +77,17 @@ group.<mainBundleId>
 
 Example: host bundle `com.example.app` → `group.com.example.app`.
 
-You must create that App Group and enable it on **both** Runner and the
-Notification Service Extension entitlements. Do not invent a different group
-name — the plugin will not read a custom id.
+Create that App Group and enable it on **both** `Runner` and the Notification
+Service Extension entitlements. Do not invent a different group name.
 
 Then:
 
-1. Add **`PusherCore`** to the extension target. It has no Flutter dependency,
-   so archive does not collide with Runner’s `pusher.framework`.
+1. Add **`PusherCore`** **only** to the NSE target (it has no `Flutter.framework`
+   dependency and does not collide with Runner’s `pusher.framework`).
 2. Push payload must include `mutable-content: 1` and `data.nid`.
 
 ```ruby
-# ios/Podfile — ImageNotification (NSE) only
+# ios/Podfile — Notification Service Extension target ONLY (not Runner)
 pod 'PusherCore', :path => File.join('.symlinks', 'plugins', 'pusher', 'ios')
 ```
 

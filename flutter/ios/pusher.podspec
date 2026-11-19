@@ -24,7 +24,9 @@ Flutter plugin bridge for Pusher native hello and notification receipts.
   }
 
   s.dependency 'Flutter'
-  s.dependency 'PusherCore', s.version.to_s
 
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'Classes/**/*', 'Sources/PusherCore/**/*.{swift,h,m}'
+  s.resource_bundles = {
+    'pusher_privacy' => ['Sources/PusherCore/PrivacyInfo.xcprivacy']
+  }
 end
