@@ -1,5 +1,5 @@
-group = "com.pusher.sdk"
-version = "0.0.4"
+group = "tr.pusher.sdk"
+version = file("../VERSION").takeIf { it.exists() }?.readText()?.trim() ?: "0.0.4"
 
 plugins {
     id("com.android.library")
@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.pusher.sdk"
+    namespace = "tr.pusher.sdk"
     compileSdk = 36
 
     buildFeatures {

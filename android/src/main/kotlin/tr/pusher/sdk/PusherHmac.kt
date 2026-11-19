@@ -1,4 +1,4 @@
-package com.pusher.sdk
+package tr.pusher.sdk
 
 import android.util.Base64
 import javax.crypto.Mac

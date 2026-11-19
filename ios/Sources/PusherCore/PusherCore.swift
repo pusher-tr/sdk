@@ -1,7 +1,7 @@
 import Foundation
 
 /// Public entry for the host Notification Service Extension.
-@objc public class PusherStats: NSObject {
+@objc public class PusherCore: NSObject {
   /// Posts delivered when `userInfo` carries `nid` (top-level or under `data`).
   /// Call `contentHandler` inside [completion] so the NSE isn't killed early.
   @objc public static func handleNotification(

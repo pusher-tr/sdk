@@ -1,4 +1,4 @@
-package com.pusher.sdk
+package tr.pusher.sdk
 
 import android.content.Context
 import io.flutter.embedding.engine.plugins.FlutterPlugin

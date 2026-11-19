@@ -2,7 +2,7 @@ name: pusher
 description: Pusher mobile SDK — device hello and notification receipts.
 publish_to: none
 version: 0.0.4
-homepage: https://github.com/GeceGibi/pusher_sdk
+homepage: https://github.com/pusher-tr/sdk
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -35,7 +35,7 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.pusher.sdk
+        package: tr.pusher.sdk
         pluginClass: PusherPlugin
       ios:
         pluginClass: PusherPlugin

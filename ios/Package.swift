@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "PusherStats",
+    name: "PusherCore",
     platforms: [
         .iOS("15.0")
     ],
     products: [
-        .library(name: "PusherStats", targets: ["PusherStats"]),
+        .library(name: "PusherCore", targets: ["PusherCore"]),
     ],
     targets: [
         .target(
-            name: "PusherStats",
-            path: "Sources/PusherStats",
+            name: "PusherCore",
+            path: "Sources/PusherCore",
             resources: [
                 .copy("PrivacyInfo.xcprivacy")
             ]

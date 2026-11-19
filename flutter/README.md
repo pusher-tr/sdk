@@ -17,12 +17,13 @@ Dart entrypoint: `import 'package:pusher/pusher.dart'`.
 dependencies:
   pusher:
     git:
-      url: https://github.com/GeceGibi/pusher_sdk.git
+      url: https://github.com/pusher-tr/sdk.git
+      path: flutter
 ```
 
 Requires Firebase Messaging in the host (`Firebase.initializeApp` before use).
 
-Android package: `com.pusher.sdk`.
+Android package: `tr.pusher.sdk`.
 
 ## Keys
 
@@ -59,7 +60,7 @@ unawaited(Pusher.receipt(nid: nid, status: .opened));
 | Platform | How |
 | --- | --- |
 | Android | Plugin `PusherMessagingReceiver` (C2DM) — no Dart handler required |
-| iOS | Host Notification Service Extension calls `PusherStats.handleNotification` |
+| iOS | Host Notification Service Extension calls `PusherCore.handleNotification` |
 
 ### iOS App Group + NSE
 
@@ -77,20 +78,20 @@ name — the plugin will not read a custom id.
 
 Then:
 
-1. Add **`PusherStats`** to the extension target. It has no Flutter dependency,
+1. Add **`PusherCore`** to the extension target. It has no Flutter dependency,
    so archive does not collide with Runner’s `pusher.framework`.
 2. Push payload must include `mutable-content: 1` and `data.nid`.
 
 ```ruby
 # ios/Podfile — ImageNotification (NSE) only
-pod 'PusherStats', :path => File.join('.symlinks', 'plugins', 'pusher', 'ios')
+pod 'PusherCore', :path => File.join('.symlinks', 'plugins', 'pusher', 'ios')
 ```
 
 ```swift
-import PusherStats
+import PusherCore
 
 // inside didReceive(_:withContentHandler:)
-PusherStats.handleNotification(request.content.userInfo) {
+PusherCore.handleNotification(request.content.userInfo) {
   contentHandler(bestAttemptContent)
 }
 ```
