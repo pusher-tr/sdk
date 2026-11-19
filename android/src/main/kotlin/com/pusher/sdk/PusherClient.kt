@@ -25,10 +25,14 @@ object PusherClient {
   private class HttpFailure(val code: Int, message: String) : IOException(message)
 
   private val executor = Executors.newSingleThreadScheduledExecutor()
+  private val deferredKeys = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
   /// Touched only on [executor].
   private var attempt = 0
   private var retryScheduled = false
+
+  private fun itemKey(item: PusherPending): String =
+    if (item.kind == PusherPending.KIND_HELLO) "hello" else "r:${item.nid}:${item.status}"
 
   /// Posts device hello. Optional fields come from Flutter [device_helpers].
   fun hello(
@@ -120,17 +124,24 @@ object PusherClient {
 
   private fun submit(context: Context, item: PusherPending, onDone: (() -> Unit)? = null) {
     val app = context.applicationContext
+    val shortTimeout = onDone != null
     // Persist immediately so neither delivered nor opened receipts are lost if the OS kills the process.
     PusherConfig.enqueuePending(app, item)
     val delayMs = if (item.kind == PusherPending.KIND_RECEIPT && item.status == STATUS_DELIVERED) {
-      // Spread delivered receipts across 0–7s (within Android's 10s BroadcastReceiver.goAsync limit).
-      java.util.concurrent.ThreadLocalRandom.current().nextLong(0, 7001)
+      // Spread delivered receipts within Android's 10s BroadcastReceiver.goAsync ANR window.
+      val maxJitter = if (shortTimeout) 4_001L else 7_001L
+      java.util.concurrent.ThreadLocalRandom.current().nextLong(0, maxJitter)
     } else {
       0L
     }
+    val key = itemKey(item)
+    if (delayMs > 0L) {
+      deferredKeys.add(key)
+    }
     executor.schedule({
+      deferredKeys.remove(key)
       try {
-        if (send(app, item)) flush(app)
+        if (send(app, item, shortTimeout)) flush(app)
       } finally {
         onDone?.invoke()
       }
@@ -144,6 +155,7 @@ object PusherClient {
     PusherLog.d("flushing ${items.size} pending")
 
     for (item in items) {
+      if (deferredKeys.contains(itemKey(item))) continue
       if (!send(app, item)) {
         return
       }
@@ -151,9 +163,9 @@ object PusherClient {
   }
 
   /// True when the item is done (sent or rejected for good). False when queued for retry.
-  private fun send(app: Context, item: PusherPending): Boolean {
+  private fun send(app: Context, item: PusherPending, shortTimeout: Boolean = false): Boolean {
     try {
-      post(app, item)
+      post(app, item, shortTimeout)
       PusherConfig.removePending(app, item)
       attempt = 0
       return true
@@ -185,7 +197,7 @@ object PusherClient {
     }, delay, TimeUnit.SECONDS)
   }
 
-  private fun post(context: Context, item: PusherPending) {
+  private fun post(context: Context, item: PusherPending, shortTimeout: Boolean = false) {
     val projectId = PusherConfig.projectId(context)
       ?: throw IllegalStateException("projectId is null")
     val statsKey = PusherConfig.statsKey(context)
@@ -226,10 +238,11 @@ object PusherClient {
     val url = URL("${PusherConfig.baseUrl()}/v1$path")
     PusherLog.d("POST start $url body=$raw")
 
+    val timeoutMs = if (shortTimeout) 4_000 else 15_000
     val connection = (url.openConnection() as HttpURLConnection).apply {
       requestMethod = "POST"
-      connectTimeout = 15_000
-      readTimeout = 15_000
+      connectTimeout = timeoutMs
+      readTimeout = timeoutMs
       doOutput = true
       setRequestProperty("content-type", "application/json")
       setRequestProperty("x-timestamp", timestamp.toString())

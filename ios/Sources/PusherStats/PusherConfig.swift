@@ -47,7 +47,7 @@ public enum PusherConfig {
   public static let defaultBaseUrl = "https://stats.pusher.tr"
 
   /// Plugin version; update manually with pubspec.yaml / podspec.
-  public static let sdkVersion = "0.0.2"
+  public static let sdkVersion = "0.0.4"
 
   /// UserDefaults for the main app or the shared App Group.
   ///

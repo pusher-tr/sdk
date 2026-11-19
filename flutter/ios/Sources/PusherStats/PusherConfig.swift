@@ -47,7 +47,7 @@ public enum PusherConfig {
   public static let defaultBaseUrl = "https://stats.pusher.tr"
 
   /// Plugin version; update manually with pubspec.yaml / podspec.
-  public static let sdkVersion = "0.0.2"
+  public static let sdkVersion = "0.0.4"
 
   /// UserDefaults for the main app or the shared App Group.
   ///
@@ -197,12 +197,19 @@ public enum PusherConfig {
     )
   }
 
-  /// Adds [item] to the disk retry queue. Duplicates are replaced, oldest drop at the cap.
+  /// Adds [item] to the disk retry queue. Duplicates preserve their original `at` timestamp
+  /// so the 48-hour retry window is measured from first creation; oldest drop at the cap.
   public static func enqueuePending(_ item: PusherPending) {
     pendingLock.lock()
     defer { pendingLock.unlock() }
-    var list = readPending().filter { !$0.isSame(as: item) }
-    list.append(item)
+    let cutoff = Date().addingTimeInterval(-pendingMaxAge)
+    let existing = readPending().filter { $0.at > cutoff }
+    let match = existing.first { $0.isSame(as: item) }
+    let merged = match != nil
+      ? PusherPending(kind: item.kind, nid: item.nid, status: item.status, token: item.token, locale: item.locale, at: match!.at)
+      : item
+    var list = existing.filter { !$0.isSame(as: item) }
+    list.append(merged)
     if list.count > maxPending {
       list.removeFirst(list.count - maxPending)
     }
@@ -210,15 +217,22 @@ public enum PusherConfig {
     PusherLog.d("enqueued pending \(item.kind.rawValue) total=\(list.count)")
   }
 
-  /// Returns and clears the retry queue. Entries older than 48 hours are dropped.
+  /// Removes [item] from the disk retry queue once sent or permanently rejected.
+  public static func removePending(_ item: PusherPending) {
+    pendingLock.lock()
+    defer { pendingLock.unlock() }
+    let cutoff = Date().addingTimeInterval(-pendingMaxAge)
+    let list = readPending().filter { $0.at > cutoff && !$0.isSame(as: item) }
+    writePending(list)
+  }
+
+  /// Returns non-expired entries waiting in the retry queue without removing them yet.
   public static func drainPending() -> [PusherPending] {
     pendingLock.lock()
     defer { pendingLock.unlock() }
     let cutoff = Date().addingTimeInterval(-pendingMaxAge)
     let list = readPending().filter { $0.at > cutoff }
-    let store = defaults()
-    store.removeObject(forKey: pendingQueueKey)
-    store.synchronize()
+    writePending(list)
     return list
   }
 

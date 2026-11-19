@@ -14,6 +14,11 @@ public enum PusherClient {
   /// Touched only on [queue].
   private static var attempt = 0
   private static var retryScheduled = false
+  private static var deferredKeys = Set<String>()
+
+  private static func itemKey(_ item: PusherPending) -> String {
+    item.kind == .hello ? "hello" : "r:\(item.nid ?? ""):\(item.status)"
+  }
 
   private struct HttpFailure: Error {
     let code: Int
@@ -122,10 +127,28 @@ public enum PusherClient {
   }
 
   private static func submit(_ item: PusherPending, completion: (() -> Void)? = nil) {
+    // Persist immediately so neither delivered nor opened receipts are lost if NSE or app is suspended.
+    PusherConfig.enqueuePending(item)
+    let delay: TimeInterval = (item.kind == .receipt && item.status == statusDelivered)
+      ? Double.random(in: 0...5.0)
+      : 0
+    let key = itemKey(item)
     queue.async {
-      defer { completion?() }
-      if send(item) {
-        flush()
+      if delay > 0 {
+        deferredKeys.insert(key)
+        queue.asyncAfter(deadline: .now() + delay) {
+          deferredKeys.remove(key)
+          defer { completion?() }
+          if send(item) {
+            flush()
+          }
+        }
+      } else {
+        deferredKeys.remove(key)
+        defer { completion?() }
+        if send(item) {
+          flush()
+        }
       }
     }
   }
@@ -136,9 +159,8 @@ public enum PusherClient {
     guard !items.isEmpty else { return }
     PusherLog.d("flushing \(items.count) pending")
 
-    for (index, item) in items.enumerated() {
+    for item in items where !deferredKeys.contains(itemKey(item)) {
       if !send(item) {
-        items.dropFirst(index + 1).forEach { PusherConfig.enqueuePending($0) }
         return
       }
     }
@@ -148,12 +170,14 @@ public enum PusherClient {
   private static func send(_ item: PusherPending) -> Bool {
     do {
       try post(item)
+      PusherConfig.removePending(item)
       attempt = 0
       return true
     } catch let error as HttpFailure {
       PusherLog.e("\(item.kind.rawValue) failed: HTTP \(error.code) \(error.body)")
       let retryable = error.code == 408 || error.code == 429 || error.code >= 500
       if !retryable {
+        PusherConfig.removePending(item)
         return true
       }
     } catch {
@@ -182,9 +206,9 @@ public enum PusherClient {
       throw NSError(domain: "Pusher", code: -1, userInfo: [NSLocalizedDescriptionKey: "config missing"])
     }
 
-    var clientId = PusherConfig.resolveClientId()
-    if clientId.isEmpty {
-      clientId = UUID().uuidString.lowercased()
+    let clientId = PusherConfig.resolveClientId()
+    guard !clientId.isEmpty else {
+      throw NSError(domain: "Pusher", code: -4, userInfo: [NSLocalizedDescriptionKey: "clientId unavailable"])
     }
 
     let fields = PusherConfig.deviceFields()

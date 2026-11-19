@@ -147,13 +147,17 @@ abstract final class Pusher {
 
     final uri = Uri.parse('$_sendBaseUrl/v1$pathAndQuery');
     _log('inbox request GET $uri');
-    final client = HttpClient();
+    const timeout = Duration(seconds: 15);
+    final client = HttpClient()..connectionTimeout = timeout;
     try {
-      final request = await client.getUrl(uri);
+      final request = await client.getUrl(uri).timeout(timeout);
       request.headers.set('x-timestamp', '$unix');
       request.headers.set('x-signature', signature);
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
+      final response = await request.close().timeout(timeout);
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(timeout);
       _log('inbox response ${response.statusCode} $body');
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
@@ -210,10 +214,12 @@ abstract final class Pusher {
     _attached = true;
     _log('attach listeners');
 
-    FirebaseMessaging.onMessage.listen((message) {
-      _log('onMessage data=${message.data}');
-      unawaited(_receiptFromMessage(message, .delivered));
-    });
+    if (!Platform.isAndroid) {
+      FirebaseMessaging.onMessage.listen((message) {
+        _log('onMessage data=${message.data}');
+        unawaited(_receiptFromMessage(message, .delivered));
+      });
+    }
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       _log('onMessageOpenedApp data=${message.data}');
